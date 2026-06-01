@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+# Backend production config (kept only on server, never committed)
+job-tracker-backend/src/main/resources/application-prod.yml
+
+# Backend local config (contains credentials, never committed)
+job-tracker-backend/application-local.yml
+
+# Backend build output
+job-tracker-backend/target/
+
+# Uploaded files
+/uploads/

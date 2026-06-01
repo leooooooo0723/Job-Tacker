@@ -1,0 +1,19 @@
+# 复制此文件为 application-prod.yml，填入你自己的值
+# 启动时加 --spring.profiles.active=prod
+
+spring:
+  datasource:
+    username: your_mysql_username
+    password: your_mysql_password
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/job_tracker   # 如不使用可删除
+
+jwt:
+  secret: replace-with-a-random-64-char-string
+
+deepseek:
+  api-key: sk-xxxxxxxxxxxxxxxx
+
+file:
+  upload-dir: ./uploads/resumes
