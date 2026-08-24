@@ -1,4 +1,3 @@
-"use client";
 import { useEffect, useState, useCallback } from "react";
 import { format } from "date-fns";
 import { apiFetch } from "@/lib/api";
@@ -25,7 +24,7 @@ import { Plus, CalendarPlus, Trash2, ChevronDown, ChevronUp, ExternalLink } from
 import { toast } from "sonner";
 import CycleSelector from "@/components/CycleSelector";
 import StatusPipeline from "@/components/StatusPipeline";
-import { APPLICATION_STATUSES } from "@/lib/constants";
+import { APPLICATION_STATUSES, FAIL_NODE_LABELS } from "@/lib/constants";
 
 interface Company {
   id: string;
@@ -48,6 +47,7 @@ interface Application {
   jdLink: string;
   base: string;
   status: string;
+  failNode: string | null;
   appliedAt: string;
   notes: string;
   company: Company;
@@ -91,6 +91,10 @@ export default function ApplicationsPage() {
 
   const [cycleDialogOpen, setCycleDialogOpen] = useState(false);
   const [newCycleName, setNewCycleName] = useState("");
+
+  const [failNodeDialogOpen, setFailNodeDialogOpen] = useState(false);
+  const [pendingFailAppId, setPendingFailAppId] = useState<string | null>(null);
+  const [selectedFailNode, setSelectedFailNode] = useState<string>(FAIL_NODE_LABELS[0]);
   const [companySearch, setCompanySearch] = useState("");
   const [showCompanyDrop, setShowCompanyDrop] = useState(false);
   const [showBaseDrop, setShowBaseDrop] = useState(false);
@@ -150,14 +154,38 @@ export default function ApplicationsPage() {
   }
 
   async function updateStatus(id: string, status: string) {
+    if (status === "已挂") {
+      setPendingFailAppId(id);
+      setSelectedFailNode(FAIL_NODE_LABELS[0]);
+      setFailNodeDialogOpen(true);
+      return;
+    }
     await apiFetch(`/api/applications/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
     setApplications((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status } : a))
+      prev.map((a) => (a.id === id ? { ...a, status, failNode: null } : a))
     );
+  }
+
+  async function confirmFail() {
+    if (!pendingFailAppId) return;
+    await apiFetch(`/api/applications/${pendingFailAppId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "已挂", failNode: selectedFailNode }),
+    });
+    setApplications((prev) =>
+      prev.map((a) =>
+        a.id === pendingFailAppId
+          ? { ...a, status: "已挂", failNode: selectedFailNode }
+          : a
+      )
+    );
+    setFailNodeDialogOpen(false);
+    setPendingFailAppId(null);
   }
 
   async function saveNotes(id: string, notes: string) {
@@ -319,7 +347,7 @@ export default function ApplicationsPage() {
                                   </a>
                                 )}
                               </div>
-                              <StatusPipeline status={app.status} />
+                              <StatusPipeline status={app.status} failNode={app.failNode} />
                             </div>
 
                             {/* 操作区 */}
@@ -671,6 +699,31 @@ export default function ApplicationsPage() {
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCycleDialogOpen(false)}>取消</Button>
               <Button onClick={createCycle} disabled={!newCycleName}>创建</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 已挂：选择挂在哪个节点 */}
+      <Dialog open={failNodeDialogOpen} onOpenChange={(open) => { if (!open) { setFailNodeDialogOpen(false); setPendingFailAppId(null); } }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>在哪个节点挂的？</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={selectedFailNode} onValueChange={(v) => { if (v) setSelectedFailNode(v); }}>
+              <SelectTrigger>
+                <span>{selectedFailNode}</span>
+              </SelectTrigger>
+              <SelectContent>
+                {FAIL_NODE_LABELS.map((n) => (
+                  <SelectItem key={n} value={n}>{n}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setFailNodeDialogOpen(false); setPendingFailAppId(null); }}>取消</Button>
+              <Button onClick={confirmFail}>确认</Button>
             </div>
           </div>
         </DialogContent>

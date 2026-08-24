@@ -6,6 +6,7 @@ import lombok.Data;
 public class ApplicationUpdateRequest {
     private String status;
     private String failReason;
+    private String failNode;
     private String notes;
     private String positionName;
     private String jdLink;

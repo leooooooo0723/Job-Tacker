@@ -1,4 +1,3 @@
-"use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";

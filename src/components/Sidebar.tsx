@@ -1,6 +1,4 @@
-"use client";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Building2, ClipboardList, MessageCircle, LogOut, FileText, Trophy } from "lucide-react";
 
 const links = [
@@ -18,14 +16,14 @@ interface Props {
 }
 
 export default function Sidebar({ username, role }: Props) {
-  const pathname = usePathname();
-  const router = useRouter();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
 
   function handleLogout() {
     localStorage.removeItem("token");
     localStorage.removeItem("username");
     localStorage.removeItem("role");
-    router.push("/login");
+    navigate("/login");
   }
 
   return (
@@ -33,7 +31,7 @@ export default function Sidebar({ username, role }: Props) {
       <div className="px-3 mb-8">
         <h1 className="text-lg font-bold text-primary tracking-tight">OfferOS</h1>
         <Link
-          href="/account"
+          to="/account"
           className="text-xs text-muted-foreground mt-0.5 truncate block hover:text-foreground transition-colors"
         >
           {username}
@@ -50,7 +48,7 @@ export default function Sidebar({ username, role }: Props) {
           return (
             <Link
               key={href}
-              href={href}
+              to={href}
               className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
                 active
                   ? "bg-primary/10 text-primary font-medium"

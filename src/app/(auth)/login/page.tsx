@@ -1,15 +1,13 @@
-"use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Link from "next/link";
 import { apiFetch, saveToken } from "@/lib/api";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +26,7 @@ export default function LoginPage() {
         saveToken(data.token);
         localStorage.setItem("username", data.username);
         localStorage.setItem("role", data.role);
-        router.push("/");
+        navigate("/");
       } else {
         let msg = "登录失败";
         try { msg = (await res.json()).error ?? msg; } catch {}
@@ -81,7 +79,7 @@ export default function LoginPage() {
         </form>
         <p className="text-center text-sm text-muted-foreground mt-4">
           还没有账号？{" "}
-          <Link href="/register" className="text-primary hover:underline font-medium">
+          <Link to="/register" className="text-primary hover:underline font-medium">
             注册
           </Link>
         </p>

@@ -43,6 +43,9 @@ public class Application {
     @Column(name = "fail_reason", length = 500)
     private String failReason;
 
+    @Column(name = "fail_node", length = 50)
+    private String failNode;
+
     @Column(name = "applied_at")
     @Builder.Default
     private LocalDateTime appliedAt = LocalDateTime.now();

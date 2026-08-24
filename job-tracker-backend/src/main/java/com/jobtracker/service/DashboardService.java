@@ -30,22 +30,30 @@ public class DashboardService {
 
         if (cycleId != null && !cycleId.isBlank()) {
             todayEvents = eventRepository.findTodayEventsByUserIdAndCycleId(userId, cycleId, startOfDay, endOfDay);
-            applications = applicationRepository.findByUserIdAndCycleId(userId, cycleId);
+            applications = applicationRepository.findByUserIdAndCycleIdWithCompany(userId, cycleId);
         } else {
             todayEvents = eventRepository.findTodayEventsByUserId(userId, startOfDay, endOfDay);
-            applications = applicationRepository.findByUserId(userId);
+            applications = applicationRepository.findByUserIdWithCompany(userId);
         }
 
         Map<String, Long> byStatus = applications.stream()
                 .collect(Collectors.groupingBy(Application::getStatus, Collectors.counting()));
 
-        List<String> appIds = todayEvents.stream()
-                .map(Event::getApplicationId)
-                .distinct()
-                .collect(Collectors.toList());
-        Map<String, Application> appMap = appIds.isEmpty() ? Map.of() :
-                applicationRepository.findAllByIdWithCompany(appIds).stream()
-                        .collect(Collectors.toMap(Application::getId, a -> a));
+        // per-status detail list for hover tooltips
+        Map<String, List<Map<String, Object>>> byStatusDetails = applications.stream()
+                .collect(Collectors.groupingBy(
+                        Application::getStatus,
+                        Collectors.mapping(a -> {
+                            Map<String, Object> item = new HashMap<>();
+                            item.put("companyName", a.getCompany() != null ? a.getCompany().getName() : "");
+                            item.put("positionName", a.getPositionName());
+                            item.put("failNode", a.getFailNode());
+                            return item;
+                        }, Collectors.toList())
+                ));
+
+        Map<String, Application> appMap = applications.stream()
+                .collect(Collectors.toMap(Application::getId, a -> a));
 
         List<Map<String, Object>> eventDtos = todayEvents.stream().map(e -> {
             Map<String, Object> dto = new HashMap<>();
@@ -67,6 +75,7 @@ public class DashboardService {
         result.put("todayEvents", eventDtos);
         result.put("total", applications.size());
         result.put("byStatus", byStatus);
+        result.put("byStatusDetails", byStatusDetails);
         return result;
     }
 }

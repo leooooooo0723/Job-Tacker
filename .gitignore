@@ -51,5 +51,9 @@ job-tracker-backend/application-local.yml
 # Backend build output
 job-tracker-backend/target/
 
-# Uploaded files
-/uploads/
+# Uploaded files (user data, never committed)
+job-tracker-backend/uploads/
+uploads/
+
+# IntelliJ IDEA local state
+job-tracker-backend/.idea/workspace.xml

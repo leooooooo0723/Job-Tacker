@@ -1,10 +1,6 @@
-const BASE_URL =
-  typeof window === "undefined"
-    ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080")
-    : "";
+const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 function getToken(): string | null {
-  if (typeof window === "undefined") return null;
   return localStorage.getItem("token");
 }
 
@@ -30,9 +26,10 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
 
   const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
 
-  if ((res.status === 401 || res.status === 403) && !path.startsWith("/api/auth/")) {
+  if (res.status === 401 && !path.startsWith("/api/auth/")) {
     clearToken();
     window.location.href = "/login";
+    return new Promise(() => {});
   }
 
   return res;

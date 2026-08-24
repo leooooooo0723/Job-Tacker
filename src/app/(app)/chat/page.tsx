@@ -1,4 +1,3 @@
-"use client";
 import { apiFetch } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";

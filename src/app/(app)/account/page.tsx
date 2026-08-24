@@ -1,6 +1,5 @@
-"use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +14,7 @@ interface UserInfo {
 }
 
 export default function AccountPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [info, setInfo] = useState<UserInfo | null>(null);
 
   const [pwForm, setPwForm] = useState({ oldPassword: "", newPassword: "", confirm: "" });
@@ -59,7 +58,7 @@ export default function AccountPage() {
     if (res.ok) {
       clearToken();
       toast.success("账户已注销");
-      router.push("/login");
+      navigate("/login");
     } else {
       toast.error("注销失败，请重试");
       setDeleteLoading(false);

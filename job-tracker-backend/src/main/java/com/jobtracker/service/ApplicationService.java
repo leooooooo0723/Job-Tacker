@@ -41,6 +41,7 @@ public class ApplicationService {
                 .orElseThrow(() -> new IllegalArgumentException("投递记录不存在"));
         if (req.getStatus() != null) app.setStatus(req.getStatus());
         if (req.getFailReason() != null) app.setFailReason(req.getFailReason());
+        if (req.getFailNode() != null) app.setFailNode(req.getFailNode());
         if (req.getNotes() != null) app.setNotes(req.getNotes());
         if (req.getPositionName() != null) app.setPositionName(req.getPositionName());
         if (req.getJdLink() != null) app.setJdLink(req.getJdLink());

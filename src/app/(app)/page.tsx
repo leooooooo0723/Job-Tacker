@@ -1,4 +1,3 @@
-"use client";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -17,10 +16,17 @@ import CycleSelector from "@/components/CycleSelector";
 import { APPLICATION_STATUSES } from "@/lib/constants";
 import { apiFetch } from "@/lib/api";
 
+interface StatusDetail {
+  companyName: string;
+  positionName: string;
+  failNode: string | null;
+}
+
 interface DashboardData {
   todayEvents: TodayEvent[];
   total: number;
   byStatus: Record<string, number>;
+  byStatusDetails: Record<string, StatusDetail[]>;
 }
 
 interface TodayEvent {
@@ -46,6 +52,7 @@ const STATUS_ORDER = APPLICATION_STATUSES as readonly string[];
 export default function DashboardPage() {
   const [cycleId, setCycleId] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
+  const [tooltip, setTooltip] = useState<{ status: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     const url = cycleId ? `/api/dashboard?cycleId=${cycleId}` : "/api/dashboard";
@@ -120,21 +127,86 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="py-3">
-          <CardContent className="px-4">
-            <p className="text-xs text-muted-foreground">总投递</p>
-            <p className="text-2xl font-semibold mt-1">{data?.total ?? 0}</p>
-          </CardContent>
-        </Card>
-        {statusCards.map(({ status, count }) => (
-          <Card key={status} className="py-3">
+        <div
+          onMouseEnter={(e) => {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            setTooltip({ status: "__total__", x: rect.left, y: rect.bottom });
+          }}
+          onMouseLeave={() => setTooltip(null)}
+        >
+          <Card className="py-3 cursor-default">
             <CardContent className="px-4">
-              <p className="text-xs text-muted-foreground">{status}</p>
-              <p className="text-2xl font-semibold mt-1">{count}</p>
+              <p className="text-xs text-muted-foreground">总投递</p>
+              <p className="text-2xl font-semibold mt-1">{data?.total ?? 0}</p>
             </CardContent>
           </Card>
-        ))}
+        </div>
+        {statusCards.map(({ status, count }) => {
+          const isFailStatus = status === "已挂";
+          return (
+            <div
+              key={status}
+              onMouseEnter={(e) => {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setTooltip({ status, x: rect.left, y: rect.bottom });
+              }}
+              onMouseLeave={() => setTooltip(null)}
+            >
+              <Card className="py-3 cursor-default">
+                <CardContent className="px-4">
+                  <p className={`text-xs ${isFailStatus ? "text-red-500" : "text-muted-foreground"}`}>{status}</p>
+                  <p className={`text-2xl font-semibold mt-1 ${isFailStatus ? "text-red-600" : ""}`}>{count}</p>
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })}
       </div>
+
+      {/* 状态悬浮详情 — fixed 定位，脱离所有 overflow 限制 */}
+      {tooltip && (() => {
+        const isTotal = tooltip.status === "__total__";
+        const details: (StatusDetail & { status?: string })[] = isTotal
+          ? Object.entries(data?.byStatusDetails ?? {}).flatMap(([s, arr]) =>
+              arr.map((d) => ({ ...d, status: s }))
+            )
+          : (data?.byStatusDetails?.[tooltip.status] ?? []);
+        const label = isTotal ? "总投递" : tooltip.status;
+        const count = isTotal ? (data?.total ?? 0) : (data?.byStatus?.[tooltip.status] ?? 0);
+        if (details.length === 0) return null;
+        return (
+          <div
+            style={{ position: "fixed", left: tooltip.x, top: tooltip.y + 6, zIndex: 9999 }}
+            className="w-60 bg-white border border-gray-200 rounded-md shadow-xl py-1.5"
+            onMouseLeave={() => setTooltip(null)}
+          >
+            <p className="text-xs font-medium text-gray-500 px-3 pb-1 border-b border-gray-100 mb-1">
+              {label} · {count} 条
+            </p>
+            <ul className="max-h-60 overflow-y-auto">
+              {details.map((d, i) => {
+                const isFail = (d.status ?? tooltip.status) === "已挂";
+                return (
+                  <li key={i} className="px-3 py-1.5 hover:bg-gray-50">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium leading-tight text-gray-800 truncate">{d.companyName}</p>
+                      {isTotal && d.status && (
+                        <span className={`text-[10px] shrink-0 px-1 rounded ${isFail ? "bg-red-50 text-red-500" : "bg-gray-100 text-gray-500"}`}>{d.status}</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 leading-tight mt-0.5">
+                      {d.positionName || "未填写岗位"}
+                      {isFail && d.failNode && (
+                        <span className="ml-1.5 text-red-500">· 挂/{d.failNode}</span>
+                      )}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })()}
 
       <Card>
         <CardHeader className="pb-2">

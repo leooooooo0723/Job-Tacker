@@ -16,13 +16,29 @@ export const APPLICATION_STATUSES = [
   "已HR面",
   "offer",
   "三方签约",
+  "已挂",
 ] as const;
+
+export const FAIL_NODE_LABELS = [
+  "投递",
+  "测评",
+  "笔试",
+  "AI面试",
+  "一面",
+  "二面",
+  "三面",
+  "HR面",
+  "Offer",
+] as const;
+
+export type FailNode = (typeof FAIL_NODE_LABELS)[number];
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
 export function getStatusColor(status: string): string {
   if (status === "offer") return "bg-green-100 text-green-700";
   if (status === "三方签约") return "bg-green-200 text-green-800";
+  if (status === "已挂") return "bg-red-100 text-red-600";
   if (status === "已投递") return "bg-gray-100 text-gray-600";
   if (status.startsWith("待")) return "bg-amber-100 text-amber-700";
   if (status.startsWith("已")) return "bg-blue-100 text-blue-700";

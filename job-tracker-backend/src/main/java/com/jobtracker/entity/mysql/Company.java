@@ -1,11 +1,13 @@
 package com.jobtracker.entity.mysql;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Entity
 @Table(name = "companies")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
