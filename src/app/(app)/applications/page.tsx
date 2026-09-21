@@ -235,16 +235,26 @@ export default function ApplicationsPage() {
   }
 
   // 按公司分组
-  const grouped = Object.values(
-    applications.reduce(
-      (acc, app) => {
-        if (!acc[app.companyId]) acc[app.companyId] = { company: app.company, items: [] };
-        acc[app.companyId].items.push(app);
-        return acc;
-      },
-      {} as Record<string, { company: Company; items: Application[] }>
-    )
-  );
+  const [filter, setFilter] = useState<"全部" | "进行中" | "已挂">("全部");
+
+  function groupByCompany(apps: Application[]) {
+    return Object.values(
+      apps.reduce(
+        (acc, app) => {
+          if (!acc[app.companyId]) acc[app.companyId] = { company: app.company, items: [] };
+          acc[app.companyId].items.push(app);
+          return acc;
+        },
+        {} as Record<string, { company: Company; items: Application[] }>
+      )
+    );
+  }
+
+  const activeApps = applications.filter((a) => a.status !== "已挂");
+  const failedApps = applications.filter((a) => a.status === "已挂");
+
+  const groupedActive = groupByCompany(activeApps);
+  const groupedFailed = groupByCompany(failedApps);
 
   const lockedCompany = addAppLockedCompanyId
     ? companies.find((c) => c.id === addAppLockedCompanyId)
@@ -294,14 +304,41 @@ export default function ApplicationsPage() {
         ))}
       </div>
 
+      {/* 筛选器 */}
+      <div className="flex gap-1">
+        {(["全部", "进行中", "已挂"] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              filter === f
+                ? f === "已挂"
+                  ? "bg-red-100 text-red-600"
+                  : "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {f}
+            <span className="ml-1 opacity-60">
+              {f === "全部" ? applications.length : f === "进行中" ? activeApps.length : failedApps.length}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* 内容 */}
-      {grouped.length === 0 ? (
+      {applications.length === 0 ? (
         <p className="text-sm text-gray-400 py-12 text-center">
           暂无投递记录{cycleId ? "，点击「新增投递」开始" : ""}
         </p>
       ) : (
-        <div className="space-y-3">
-          {grouped.map(({ company, items }) => {
+        <>
+        {(filter === "全部" || filter === "进行中") && groupedActive.length > 0 && (
+          <div className="space-y-3">
+            {filter === "全部" && (
+              <p className="text-xs font-medium text-muted-foreground px-1">进行中 · {activeApps.length}</p>
+            )}
+            {groupedActive.map(({ company, items }) => {
             const isExpanded = expandedCompanies.has(company.id);
             return (
               <Card key={company.id} className="overflow-hidden">
@@ -467,7 +504,70 @@ export default function ApplicationsPage() {
               </Card>
             );
           })}
-        </div>
+          </div>
+        )}
+
+        {(filter === "全部" || filter === "已挂") && groupedFailed.length > 0 && (
+          <div className="space-y-3">
+            {filter === "全部" && (
+              <p className="text-xs font-medium text-red-400 px-1 mt-2">已挂 · {failedApps.length}</p>
+            )}
+            {groupedFailed.map(({ company, items }) => {
+              const isExpanded = expandedCompanies.has(company.id);
+              return (
+                <Card key={company.id} className="overflow-hidden border-red-100">
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
+                    onClick={() => toggleCompany(company.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-semibold text-sm text-red-700/80">{company.name}</span>
+                      <span className="text-xs text-muted-foreground">{items.length} 个岗位</span>
+                    </div>
+                    {isExpanded ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
+                  </button>
+                  {isExpanded && (
+                    <div className="border-t divide-y">
+                      {items.map((app) => (
+                        <div key={app.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-medium text-gray-500">{app.positionName || "未填写岗位"}</span>
+                              {app.jdLink && (
+                                <a
+                                  href={app.jdLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                                >
+                                  JD <ExternalLink size={10} />
+                                </a>
+                              )}
+                            </div>
+                            <StatusPipeline status={app.status} failNode={app.failNode} />
+                          </div>
+                          <button
+                            className="text-muted-foreground hover:text-red-500 p-1 shrink-0"
+                            onClick={() => deleteApp(app.id, `${company.name} · ${app.positionName || "该岗位"}`)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {((filter === "进行中" && groupedActive.length === 0) ||
+          (filter === "已挂" && groupedFailed.length === 0)) && (
+          <p className="text-sm text-gray-400 py-12 text-center">暂无{filter}记录</p>
+        )}
+        </>
       )}
 
       {/* 新增投递 / 新增岗位弹窗 */}

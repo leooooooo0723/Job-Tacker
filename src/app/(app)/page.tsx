@@ -53,6 +53,7 @@ export default function DashboardPage() {
   const [cycleId, setCycleId] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
   const [tooltip, setTooltip] = useState<{ status: string; x: number; y: number } | null>(null);
+  const [pinned, setPinned] = useState<string | null>(null);
 
   useEffect(() => {
     const url = cycleId ? `/api/dashboard?cycleId=${cycleId}` : "/api/dashboard";
@@ -128,13 +129,20 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div
+          onClick={(e) => {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            if (pinned === "__total__") { setPinned(null); setTooltip(null); return; }
+            setPinned("__total__");
+            setTooltip({ status: "__total__", x: rect.left, y: rect.bottom });
+          }}
           onMouseEnter={(e) => {
+            if (pinned) return;
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
             setTooltip({ status: "__total__", x: rect.left, y: rect.bottom });
           }}
-          onMouseLeave={() => setTooltip(null)}
+          onMouseLeave={() => { if (!pinned) setTooltip(null); }}
         >
-          <Card className="py-3 cursor-default">
+          <Card className={`py-3 cursor-pointer ${pinned === "__total__" ? "ring-2 ring-primary" : ""}`}>
             <CardContent className="px-4">
               <p className="text-xs text-muted-foreground">总投递</p>
               <p className="text-2xl font-semibold mt-1">{data?.total ?? 0}</p>
@@ -146,13 +154,20 @@ export default function DashboardPage() {
           return (
             <div
               key={status}
+              onClick={(e) => {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                if (pinned === status) { setPinned(null); setTooltip(null); return; }
+                setPinned(status);
+                setTooltip({ status, x: rect.left, y: rect.bottom });
+              }}
               onMouseEnter={(e) => {
+                if (pinned) return;
                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                 setTooltip({ status, x: rect.left, y: rect.bottom });
               }}
-              onMouseLeave={() => setTooltip(null)}
+              onMouseLeave={() => { if (!pinned) setTooltip(null); }}
             >
-              <Card className="py-3 cursor-default">
+              <Card className={`py-3 cursor-pointer ${pinned === status ? "ring-2 ring-primary" : ""}`}>
                 <CardContent className="px-4">
                   <p className={`text-xs ${isFailStatus ? "text-red-500" : "text-muted-foreground"}`}>{status}</p>
                   <p className={`text-2xl font-semibold mt-1 ${isFailStatus ? "text-red-600" : ""}`}>{count}</p>
@@ -175,11 +190,18 @@ export default function DashboardPage() {
         const count = isTotal ? (data?.total ?? 0) : (data?.byStatus?.[tooltip.status] ?? 0);
         if (details.length === 0) return null;
         return (
-          <div
-            style={{ position: "fixed", left: tooltip.x, top: tooltip.y + 6, zIndex: 9999 }}
-            className="w-60 bg-white border border-gray-200 rounded-md shadow-xl py-1.5"
-            onMouseLeave={() => setTooltip(null)}
-          >
+          <>
+            {pinned && (
+              <div
+                className="fixed inset-0 z-[9998]"
+                onClick={() => { setPinned(null); setTooltip(null); }}
+              />
+            )}
+            <div
+              style={{ position: "fixed", left: tooltip.x, top: tooltip.y + 6, zIndex: 9999 }}
+              className="w-60 bg-white border border-gray-200 rounded-md shadow-xl py-1.5"
+              onMouseLeave={() => { if (!pinned) setTooltip(null); }}
+            >
             <p className="text-xs font-medium text-gray-500 px-3 pb-1 border-b border-gray-100 mb-1">
               {label} · {count} 条
             </p>
@@ -205,6 +227,7 @@ export default function DashboardPage() {
               })}
             </ul>
           </div>
+          </>
         );
       })()}
 

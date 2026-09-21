@@ -61,11 +61,21 @@ public class ChatService {
         ArrayNode messages = objectMapper.createArrayNode();
 
         // DeepSeek/OpenAI 格式：system 作为第一条消息
+        // 注入活跃周期上下文
+        var activeCycleOpt = jobCycleRepository.findByUserIdAndIsActiveTrue(userId);
+        String cycleContext = activeCycleOpt.map(c ->
+                String.format("用户当前激活的求职周期是「%s」（ID: %s）。", c.getName(), c.getId())
+        ).orElse("用户暂无激活的求职周期。");
+
         ObjectNode systemMsg = objectMapper.createObjectNode();
         systemMsg.put("role", "system");
         systemMsg.put("content", String.format(
-                "你是 %s 的求职管理助手（OfferOS）。帮助用户查询今日安排、统计投递情况、添加面试记录、更新状态。今天是 %s。回答简洁，直接给出信息，不要多余的寒暄。",
-                username, LocalDate.now().toString()));
+                "你是 %s 的求职管理助手（OfferOS）。今天是 %s。%s\n" +
+                "你能做的事：查询今日面试安排、统计/分析投递情况、查询所有求职周期、添加面试记录、更新投递状态。\n" +
+                "当用户说某个周期名称（如「2027秋招」）时，先调用 get_cycles 找到对应 ID，再用 ID 查询。\n" +
+                "对于「分析」「对比」等开放问题，先调用 get_applications_detail 获取明细数据，再基于真实数据给出分析。\n" +
+                "回答简洁直接，不要多余寒暄。如果数据为空，明确告知原因。",
+                username, LocalDate.now().toString(), cycleContext));
         messages.add(systemMsg);
 
         for (ChatMessage m : history) {
@@ -157,8 +167,10 @@ public class ChatService {
     private String executeTool(String userId, String toolName, JsonNode input) {
         try {
             return switch (toolName) {
+                case "get_cycles" -> getCycles(userId);
                 case "get_today_schedule" -> getTodaySchedule(userId, input);
                 case "get_applications_summary" -> getApplicationsSummary(userId, input);
+                case "get_applications_detail" -> getApplicationsDetail(userId, input);
                 case "add_event" -> addEvent(userId, input);
                 case "update_application_status" -> updateApplicationStatus(userId, input);
                 default -> "未知操作";
@@ -166,6 +178,44 @@ public class ChatService {
         } catch (Exception e) {
             return "操作失败: " + e.getMessage();
         }
+    }
+
+    private String getCycles(String userId) {
+        var cycles = jobCycleRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        if (cycles.isEmpty()) return "暂无求职周期";
+        return cycles.stream()
+                .map(c -> String.format("- %s（ID: %s）%s", c.getName(), c.getId(), Boolean.TRUE.equals(c.getIsActive()) ? " [当前激活]" : ""))
+                .collect(Collectors.joining("\n"));
+    }
+
+    private String getApplicationsDetail(String userId, JsonNode input) {
+        String cycleId = input.path("cycleId").asText(null);
+        List<Application> apps = (cycleId != null && !cycleId.isEmpty())
+                ? applicationRepository.findByUserIdAndCycleIdWithCompany(userId, cycleId)
+                : applicationRepository.findByUserIdWithCompany(userId);
+
+        if (apps.isEmpty()) return "暂无投递记录";
+
+        // 按状态分组输出
+        Map<String, List<Application>> grouped = apps.stream()
+                .collect(Collectors.groupingBy(Application::getStatus));
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("共投递 ").append(apps.size()).append(" 个岗位：\n\n");
+        grouped.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> {
+                    sb.append("【").append(entry.getKey()).append("】").append(entry.getValue().size()).append("家\n");
+                    entry.getValue().forEach(a -> {
+                        String company = a.getCompany() != null ? a.getCompany().getName() : "未知";
+                        String pos = a.getPositionName().isEmpty() ? "" : " · " + a.getPositionName();
+                        String failInfo = (a.getFailNode() != null && !a.getFailNode().isEmpty())
+                                ? "（挂/" + a.getFailNode() + "）" : "";
+                        sb.append("  - ").append(company).append(pos).append(failInfo).append("\n");
+                    });
+                    sb.append("\n");
+                });
+        return sb.toString().trim();
     }
 
     private String getTodaySchedule(String userId, JsonNode input) {
@@ -284,6 +334,14 @@ public class ChatService {
               {
                 "type": "function",
                 "function": {
+                  "name": "get_cycles",
+                  "description": "获取用户所有求职周期列表（名称和ID），用于将周期名称转换为ID",
+                  "parameters": {"type":"object","properties":{},"required":[]}
+                }
+              },
+              {
+                "type": "function",
+                "function": {
                   "name": "get_today_schedule",
                   "description": "获取今日的面试、笔试、测评安排",
                   "parameters": {"type":"object","properties":{"cycleId":{"type":"string","description":"求职周期ID，不填则查询所有"}},"required":[]}
@@ -293,8 +351,16 @@ public class ChatService {
                 "type": "function",
                 "function": {
                   "name": "get_applications_summary",
-                  "description": "获取当前求职周期的投递统计，包含总数和各阶段数量",
-                  "parameters": {"type":"object","properties":{"cycleId":{"type":"string","description":"求职周期ID"}},"required":[]}
+                  "description": "获取投递数量统计（各状态数量汇总）",
+                  "parameters": {"type":"object","properties":{"cycleId":{"type":"string","description":"求职周期ID，不填则查询所有"}},"required":[]}
+                }
+              },
+              {
+                "type": "function",
+                "function": {
+                  "name": "get_applications_detail",
+                  "description": "获取投递明细列表（公司名、岗位、状态、挂在节点），用于分析、统计、对比",
+                  "parameters": {"type":"object","properties":{"cycleId":{"type":"string","description":"求职周期ID，不填则查询所有"}},"required":[]}
                 }
               },
               {
@@ -310,7 +376,7 @@ public class ChatService {
                 "function": {
                   "name": "update_application_status",
                   "description": "更新某个公司岗位的投递状态。先确认再执行。",
-                  "parameters": {"type":"object","properties":{"companyName":{"type":"string"},"positionName":{"type":"string"},"status":{"type":"string","enum":["已投递","待测评","已测评","待笔试","已笔试","待AI面试","已AI面试","待一面","已一面","待二面","已二面","待三面","已三面","待HR面","已HR面","offer","三方签约"]},"confirmed":{"type":"boolean"}},"required":["companyName","status"]}
+                  "parameters": {"type":"object","properties":{"companyName":{"type":"string"},"positionName":{"type":"string"},"status":{"type":"string","enum":["已投递","待测评","已测评","待笔试","已笔试","待AI面试","已AI面试","待一面","已一面","待二面","已二面","待三面","已三面","待HR面","已HR面","offer","三方签约","已挂"]},"confirmed":{"type":"boolean"}},"required":["companyName","status"]}
                 }
               }
             ]

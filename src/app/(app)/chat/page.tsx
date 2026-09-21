@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
+import MessageContent from "@/components/MessageContent";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Bot, User, Trash2 } from "lucide-react";
@@ -123,13 +124,15 @@ export default function ChatPage() {
               {msg.role === "assistant" ? <Bot size={14} /> : <User size={14} />}
             </div>
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
+              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
                 msg.role === "assistant"
                   ? "bg-white border border-gray-200 text-gray-800"
-                  : "bg-blue-600 text-white"
+                  : "bg-blue-600 text-white whitespace-pre-wrap"
               }`}
             >
-              {msg.content}
+              {msg.role === "assistant"
+                ? <MessageContent content={msg.content} />
+                : msg.content}
             </div>
           </div>
         ))}
